@@ -1,0 +1,78 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE_NAME = 'flask-student'  // Define the Docker image name
+        REPO_URL = 'https://github.com/Pragya_19gd/flask-starter.git'  // Define your GitHub repository URL
+    }
+
+    stages {
+        stage('Check Docker Daemon Access') {
+            steps {
+                script {
+                    // Check if Docker is accessible by running docker ps
+                    sh 'docker ps'
+                }
+            }
+        }
+
+        stage('Checkout') {
+            steps {
+                // Pull code from your forked GitHub repository
+                git branch: 'main', credentialsId: 'github-credential', url: 'https://github.com/Pragya-19gd/flask-starter.git'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    // Build the Docker image using the Dockerfile in the repository
+                    sh 'docker build -t ${DOCKER_IMAGE_NAME} .'
+                }
+            }
+        }
+
+       stage('Stop Previous Container') {
+    steps {
+        script {
+            // Stop any container running on port 5000
+            sh 'docker ps -q --filter "ancestor=${DOCKER_IMAGE_NAME}" | xargs -r docker stop'
+            // Optional: Remove the stopped container to free up space
+            sh 'docker ps -a -q --filter "ancestor=${DOCKER_IMAGE_NAME}" | xargs -r docker rm'
+        }
+    }
+}
+
+
+        stage('Run New Docker Container') {
+            steps {
+                script {
+                    // Run the new Docker container on port 5000
+                    sh 'docker run -d -p 5000:5000 ${DOCKER_IMAGE_NAME}'
+                }
+            }
+        }
+
+        stage('Post Actions') {
+            steps {
+                script {
+                    // Print success or failure message to Jenkins console
+                    echo 'Docker container is successfully up and running on port 5000.'
+                }
+            }
+        }
+    }
+
+    post {
+        // Archive logs and Docker container details after the pipeline completes
+        always {
+            archiveArtifacts artifacts: '**/docker_logs/*.log', allowEmptyArchive: true
+        }
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}
